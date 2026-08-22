@@ -197,7 +197,7 @@ def solve_single_pixel(args):
     
     y0 = np.zeros(48)
 
-    #Plus-polarized tensor mode ((l,m) = (2,2)) -----------------------------------------------------------------------------------------------
+    #(l,m) = (2,2) initialization to best isolate the geometries -----------------------------------------------------------------------------------------------
     y0[8]  =  1.0e-6  													  # R0_11
     y0[12] = -1.0e-6  													  # R0_22
 
@@ -363,7 +363,7 @@ if __name__ == "__main__":
     sqrt_L = np.sqrt(Omega_L)
 
     for i, t_val in enumerate(eval_times):
-        # Calculating scale factor and redshift using inverted formula -----------------------------------------------------------------------------------------------
+        #Calculating scale factor and redshift using inverted formula -----------------------------------------------------------------------------------------------
         arg = 1.5 * sqrt_L * t_val
         a_t = ((Omega_m / Omega_L)**(1/3)) * ((np.sinh(arg))**(2/3))
         z_val = (1.0 / a_t) - 1.0
@@ -374,20 +374,20 @@ if __name__ == "__main__":
         U_scale = np.nanmax(np.abs(U_maps[i]))
         #V_scale = np.nanmax(np.abs(V_maps[i]))
         
-        # Reverse row index: Bottom row = steps - 1, Top row = 0 -----------------------------------------------------------------------------------------------
+        #Reverse row index: Bottom row = steps - 1, Top row = 0 -----------------------------------------------------------------------------------------------
         row_idx = (steps - 1) - i
         
-        # Calculate base position (matplotlib subplots are 1-indexed) -----------------------------------------------------------------------------------------------
+        #Calculate base position (matplotlib subplots are 1-indexed) -----------------------------------------------------------------------------------------------
         base_pos = row_idx * cols
         
-        # Flag to determine if we need to draw column titles -----------------------------------------------------------------------------------------------
+        #Flag to determine if we need to draw column titles -----------------------------------------------------------------------------------------------
         is_top = (row_idx == 0)
 
-        # Column 1: Redshift Text Label -----------------------------------------------------------------------------------------------
+        #Column 1: Redshift Text Label -----------------------------------------------------------------------------------------------
         ax_text = fig.add_subplot(rows, cols, base_pos + 1)
         ax_text.axis('off')
         
-        # Formatting z for clean display depending on its magnitude -----------------------------------------------------------------------------------------------
+        #Formatting z for clean display depending on its magnitude -----------------------------------------------------------------------------------------------
         if i == 0:
             z_str = "z = 1100"
         elif i == steps - 1:
@@ -402,7 +402,7 @@ if __name__ == "__main__":
         ax_text.text(0.1, 0.5, f"\n{z_str}", 
                      fontsize=18, ha='left', va='center', fontweight='bold')
         
-        # Columns 2-5: The Maps -----------------------------------------------------------------------------------------------
+        #Columns 2-5: The Maps -----------------------------------------------------------------------------------------------
         plot_styled_map(T_maps[i], 'turbo', -T_scale, T_scale, "T [K]", base_pos + 2, is_top)
         plot_styled_map(P_maps[i], 'turbo', 0, P_scale, "P [K]", base_pos + 3, is_top)
         plot_styled_map(Q_maps[i], 'turbo', -Q_scale, Q_scale, "Q [K]", base_pos + 4, is_top)
@@ -415,3 +415,33 @@ if __name__ == "__main__":
     plt.savefig(save_path, dpi=200, bbox_inches='tight')
     plt.close()
     print(f"Master grid saved to: {save_path}")
+    
+    #Calculating redshift for each evaluation time using the exact cosmological formula -----------------------------------------------------------------------------------------------
+    arg2 = 1.5 * np.sqrt(Omega_L) * eval_times
+    a_t2 = ((Omega_m / Omega_L)**(1/3)) * ((np.sinh(arg2))**(2/3))
+    z_evals = (1.0 / a_t2) - 1.0
+    
+    #Compute RMS amplitudes across pixels for each time step -----------------------------------------------------------------------------------------------
+    T_rms = [np.sqrt(np.nanmean(T_maps[i]**2)) for i in range(steps)]
+    P_rms = [np.sqrt(np.nanmean(P_maps[i]**2)) for i in range(steps)]
+    Q_rms = [np.sqrt(np.nanmean(Q_maps[i]**2)) for i in range(steps)]
+    U_rms = [np.sqrt(np.nanmean(U_maps[i]**2)) for i in range(steps)]
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(z_evals, T_rms, 'o-', label='T RMS', lw=2)
+    plt.plot(z_evals, P_rms, 's-', label='P RMS', lw=2)
+    plt.plot(z_evals, Q_rms, '^-', label='Q RMS', lw=2)
+    plt.plot(z_evals, U_rms, 'd-', label='U RMS', lw=2)
+    
+    plt.xlabel('Redshift ($z$)', fontsize=12)
+    plt.ylabel('RMS Amplitude [K]', fontsize=12)
+    plt.yscale('log')
+    plt.gca().invert_xaxis()
+    plt.title(r'Evolution of fluctuation amplitudes in $\mathbb{R}^3$', fontsize=14)
+    plt.legend()
+    plt.grid(True, which="both", ls="--", alpha=0.5)
+    
+    amp_save_path = os.path.join(output_dir, "R3_ampl.png")
+    plt.savefig(amp_save_path, dpi=200, bbox_inches='tight')
+    plt.close()
+    print(f"Amplitude evolution curve saved to: {amp_save_path}")
