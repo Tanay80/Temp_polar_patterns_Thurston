@@ -429,8 +429,15 @@ if __name__ == "__main__":
         cb.formatter = ticker.FormatStrFormatter('%.2e')
         cb.update_ticks()
 
+    Omega_m = 0.31
+    Omega_L = 0.68
+    sqrt_L = np.sqrt(Omega_L)
+
     for i, t_val in enumerate(eval_times):
-        real_age = t_val * HUBBLE_TIME_GYR
+        # Calculating scale factor and redshift using inverted formula -----------------------------------------------------------------------------------------------
+        arg = 1.5 * sqrt_L * t_val
+        a_t = ((Omega_m / Omega_L)**(1/3)) * ((np.sinh(arg))**(2/3))
+        z_val = (1.0 / a_t) - 1.0
         
         T_scale = np.nanmax(np.abs(T_maps[i]))
         P_scale = np.nanmax(P_maps[i])
@@ -438,22 +445,35 @@ if __name__ == "__main__":
         U_scale = np.nanmax(np.abs(U_maps[i]))
         #V_scale = np.nanmax(np.abs(V_maps[i]))
         
-        #Reverse row index: Bottom row = steps - 1, Top row = 0 -----------------------------------------------------------------------------------------------
+        # Reverse row index: Bottom row = steps - 1, Top row = 0 -----------------------------------------------------------------------------------------------
         row_idx = (steps - 1) - i
         
-        #Calculate base position (matplotlib subplots are 1-indexed) -----------------------------------------------------------------------------------------------
+        # Calculate base position (matplotlib subplots are 1-indexed) -----------------------------------------------------------------------------------------------
         base_pos = row_idx * cols
         
-        #Flag to determine if we need to draw column titles -----------------------------------------------------------------------------------------------
+        # Flag to determine if we need to draw column titles -----------------------------------------------------------------------------------------------
         is_top = (row_idx == 0)
 
-        #Column 1: Time Text Label -----------------------------------------------------------------------------------------------
+        # Column 1: Redshift Text Label -----------------------------------------------------------------------------------------------
         ax_text = fig.add_subplot(rows, cols, base_pos + 1)
         ax_text.axis('off')
-        ax_text.text(0.1, 0.5, f"\n{real_age:.2f} Gyrs", 
+        
+        # Formatting z for clean display depending on its magnitude -----------------------------------------------------------------------------------------------
+        if i == 0:
+            z_str = "z = 1100"
+        elif i == steps - 1:
+            z_str = "z = 0.0"
+        elif z_val > 100:
+            z_str = f"z = {z_val:.0f}"
+        elif z_val > 10:
+            z_str = f"z = {z_val:.1f}"
+        else:
+            z_str = f"z = {z_val:.2f}"
+            
+        ax_text.text(0.1, 0.5, f"\n{z_str}", 
                      fontsize=18, ha='left', va='center', fontweight='bold')
         
-        #Columns 2-5: The Maps -----------------------------------------------------------------------------------------------
+        # Columns 2-5: The Maps -----------------------------------------------------------------------------------------------
         plot_styled_map(T_maps[i], 'turbo', -T_scale, T_scale, "T [K]", base_pos + 2, is_top)
         plot_styled_map(P_maps[i], 'turbo', 0, P_scale, "P [K]", base_pos + 3, is_top)
         plot_styled_map(Q_maps[i], 'turbo', -Q_scale, Q_scale, "Q [K]", base_pos + 4, is_top)
