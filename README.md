@@ -14,11 +14,11 @@ This repository contains Python scripts to simulate and analyze CMB temperature 
 
 To construct comparison tables 1-4 in the paper, this project uses full-sky astronomical data from the Planck 2018 data release. Due to their large size, these data files are omitted from the repository and must be downloaded manually:
 
-### 1. CMB Map (For Anomaly Tests)
+### 1. CMB Map (For anomaly tests) (Tables 1-3)
 * **Description:** Planck 2018 SMICA component-separated CMB map with no SZ subtraction at an $N_{\text{side}} = 2048$ HEALPix resolution.
 * **Download URL:** [Zenodo Record](https://zenodo.org/records/16283859/files/COM_CMB_IQU-smica-nosz_2048_R3.00_full.fits?download=1)
 
-### 2. Reference Power Spectra (For $E$-$B$ Decomposition)
+### 2. Reference Power Spectra (For E-B decomposition) (Table 4)
 * **Description:** Planck 2018 best-fit theory power spectrum.
 * **Download URL:** [IPAC Caltech](https://irsa.ipac.caltech.edu/data/Planck/release_3/ancillary-data/cosmoparams/COM_PowerSpect_CMB-base-plikHM-TTTEEE-lowl-lowE-lensing-minimum-theory_R3.01.txt)
 
