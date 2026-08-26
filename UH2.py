@@ -536,3 +536,19 @@ if __name__ == "__main__":
     plt.savefig(amp_save_path, dpi=200, bbox_inches='tight')
     plt.close()
     print(f"Amplitude evolution curve saved to: {amp_save_path}")
+    
+    #Comparison with official maps
+    export_dir = "results_maps"
+    os.makedirs(export_dir, exist_ok=True)
+    geometry_name = "UH2"
+    export_path = os.path.join(export_dir, f"map_{geometry_name.lower()}.npz")
+    
+    np.savez(export_path,
+            geometry=geometry_name,
+            nside=NSIDE,
+            T=T_maps[-1],
+            Q=Q_maps[-1],
+            U=U_maps[-1],
+            P=P_maps[-1]
+            )
+    print(f"Exported {geometry_name} maps to: {export_path}")
