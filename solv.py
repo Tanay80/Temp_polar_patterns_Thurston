@@ -246,7 +246,7 @@ def solve_single_pixel(args):
     y0 = np.zeros(48)
 
     #(l,m) = (2,2) initialization to best isolate the geometries -----------------------------------------------------------------------------------------------
-    y0[8]  =  1.0e-6  													  # R0_11
+    y0[8]  =  1.0e-6   												      # R0_11
     y0[12] = -1.0e-6  													  # R0_22
 
     y0[46] = theta_0
@@ -276,18 +276,23 @@ def solve_single_pixel(args):
 
         T_val = T_monopole + T_dipole + T_quadrupole
 
-        P_tensor = state_at_t[26:35].reshape(3,3)
-            
+        R2_tensor = state_at_t[26:35].reshape(3,3)
+        I2_tensor = state_at_t[35:44].reshape(3,3)
+
         e_th, e_ph = get_basis_vectors(th_f, ph_f)
-            
-        P_tt = e_th @ P_tensor @ e_th
-        P_pp = e_ph @ P_tensor @ e_ph
-        P_tp = e_th @ P_tensor @ e_ph
-        P_pt = e_ph @ P_tensor @ e_th
-            
-        Q_raw = P_tt - P_pp
-        U_raw = P_tp + P_pt
-        #V_raw = P_tp - P_pt
+
+        R_tt = e_th @ R2_tensor @ e_th
+        R_pp = e_ph @ R2_tensor @ e_ph
+        R_tp = e_th @ R2_tensor @ e_ph
+        R_pt = e_ph @ R2_tensor @ e_th
+
+        I_tt = e_th @ I2_tensor @ e_th
+        I_pp = e_ph @ I2_tensor @ e_ph
+        I_tp = e_th @ I2_tensor @ e_ph
+        I_pt = e_ph @ I2_tensor @ e_th
+
+        Q_raw = 0.5 * (R_tt - R_pp) - 0.5 * (I_tp + I_pt)
+        U_raw = -0.5 * (I_tt - I_pp) - 0.5 * (R_tp + R_pt)
             
         Psi_total = state_at_t[44] + state_at_t[45]
         cos_2psi = np.cos(2 * Psi_total)
@@ -326,7 +331,7 @@ if __name__ == "__main__":
     
     NSIDE = 32
     T_START = 3.33e-5													  #z = 1100
-    T_END = 0.96													  #z = 0
+    T_END = 0.96													          #z = 0
     steps = 4
     eval_times = np.linspace(T_START, T_END, steps)
     
@@ -341,7 +346,7 @@ if __name__ == "__main__":
     T_maps = np.full((steps, NPIX), np.nan)
     Q_maps = np.full((steps, NPIX), np.nan)
     U_maps = np.full((steps, NPIX), np.nan)
-    #V_maps = np.full((steps, NPIX), np.nan)
+    V_maps = np.full((steps, NPIX), np.nan)
     
     count = 0
     t0 = time.time()
@@ -354,7 +359,7 @@ if __name__ == "__main__":
                 T_maps[i, idx] = res_t_list[i]
                 Q_maps[i, idx] = res_q_list[i]
                 U_maps[i, idx] = res_u_list[i]      
-                #V_maps[i, idx] = res_v_list[i]
+                V_maps[i, idx] = res_v_list[i]
             count += 1
             pbar.update(1)
     pbar.close()
@@ -362,19 +367,39 @@ if __name__ == "__main__":
     T_maps = np.nan_to_num(T_maps, nan=0.0, posinf=0.0, neginf=0.0)
     Q_maps = np.nan_to_num(Q_maps, nan=0.0, posinf=0.0, neginf=0.0)
     U_maps = np.nan_to_num(U_maps, nan=0.0, posinf=0.0, neginf=0.0)
-    #V_maps = np.nan_to_num(V_maps, nan=0.0, posinf=0.0, neginf=0.0)
+    V_maps = np.nan_to_num(V_maps, nan=0.0, posinf=0.0, neginf=0.0)
     
     T_cmb_K = 2.725
-    T_maps *= T_cmb_K
-    Q_maps *= T_cmb_K
-    U_maps *= T_cmb_K
-    #V_maps *= T_cmb_K
-    P_maps = np.sqrt(Q_maps**2 + U_maps**2)
 
-    T_scale = np.nanmax(np.abs(T_maps[0]))
-    P_scale = np.nanmax(P_maps[0])
-    Q_scale = np.nanmax(np.abs(Q_maps[0]))
-    U_scale = np.nanmax(np.abs(U_maps[0]))
+    #Linear system was solved at small seed (1e-6) for numerical stability, and now rescaled post-hoc to match Planck's calibrated amplitude (0.27) (since ODEs are linear)
+    scale_factor = 0.27 / 1.0e-6                                                                            #= 2.7e5
+    
+    T_maps *= T_cmb_K * scale_factor
+    Q_maps *= T_cmb_K * scale_factor
+    U_maps *= T_cmb_K * scale_factor
+    V_maps *= T_cmb_K * scale_factor
+    P_maps = np.sqrt(Q_maps**2 + U_maps**2)
+    
+    # Find the machine's numerical noise floor for standard floats
+    noise_floor = np.finfo(float).eps
+
+    # Zero out maps if their maximum absolute amplitude is below the noise floor
+    for i in range(steps):
+        if np.nanmax(np.abs(T_maps[i])) < noise_floor:
+            T_maps[i, :] = 0.0
+        if np.nanmax(np.abs(Q_maps[i])) < noise_floor:
+            Q_maps[i, :] = 0.0
+        if np.nanmax(np.abs(U_maps[i])) < noise_floor:
+            U_maps[i, :] = 0.0
+        if np.nanmax(np.abs(V_maps[i])) < noise_floor:
+            V_maps[i, :] = 0.0
+        if np.nanmax(np.abs(P_maps[i])) < noise_floor:
+            P_maps[i, :] = 0.0
+
+    #T_scale = np.nanmax(np.abs(T_maps[0]))
+    #P_scale = np.nanmax(P_maps[0])
+    #Q_scale = np.nanmax(np.abs(Q_maps[0]))
+    #U_scale = np.nanmax(np.abs(U_maps[0]))
     #V_scale = np.nanmax(np.abs(V_maps[0]))
 
     HUBBLE_TIME_GYR = 13.97 												  #1/H0 conversion factor
@@ -402,7 +427,7 @@ if __name__ == "__main__":
         cax = fig.add_axes([pos.x0 + 0.05, pos.y0 - 0.04, pos.width - 0.1, 0.015])
         cb = plt.colorbar(sm, cax=cax, orientation='horizontal')
         cb.set_ticks([v_min, v_max])
-        cb.ax.tick_params(labelsize=10, length=0)
+        cb.ax.tick_params(labelsize=16, length=0)
         cb.formatter = ticker.FormatStrFormatter('%.2e')
         cb.update_ticks()
 
@@ -416,11 +441,32 @@ if __name__ == "__main__":
         a_t = ((Omega_m / Omega_L)**(1/3)) * ((np.sinh(arg))**(2/3))
         z_val = (1.0 / a_t) - 1.0
         
-        T_scale = np.nanmax(np.abs(T_maps[i]))
-        P_scale = np.nanmax(P_maps[i])
-        Q_scale = np.nanmax(np.abs(Q_maps[i]))
-        U_scale = np.nanmax(np.abs(U_maps[i]))
+        #T_scale_avg = np.mean([np.nanmax(np.abs(T_maps[j])) for j in range(1, steps)])
+        #P_scale_avg = np.mean([np.nanmax(P_maps[j]) for j in range(1, steps)])
+        #Q_scale_avg = np.mean([np.nanmax(np.abs(Q_maps[j])) for j in range(1, steps)])
+        #U_scale_avg = np.mean([np.nanmax(np.abs(U_maps[j])) for j in range(1, steps)])
+
+        T_scale_avg = np.mean([np.nanpercentile(np.abs(T_maps[j]), 99.5) for j in range(1, steps)])
+        P_scale_avg = np.mean([np.nanpercentile(P_maps[j], 99.5) for j in range(1, steps)])
+        Q_scale_avg = np.mean([np.nanpercentile(np.abs(Q_maps[j]), 99.5) for j in range(1, steps)])
+        U_scale_avg = np.mean([np.nanpercentile(np.abs(U_maps[j]), 99.5) for j in range(1, steps)])
+        
+        if i == 0:
+            #T_scale = np.nanmax(np.abs(T_maps[i]))
+            #P_scale = np.nanmax(P_maps[i])
+            #Q_scale = np.nanmax(np.abs(Q_maps[i]))
+            #U_scale = np.nanmax(np.abs(U_maps[i]))
+            T_scale = np.nanpercentile(np.abs(T_maps[i]), 99.5)
+            P_scale = np.nanpercentile(P_maps[i], 99.5)
+            Q_scale = np.nanpercentile(np.abs(Q_maps[i]), 99.5)
+            U_scale = np.nanpercentile(np.abs(U_maps[i]), 99.5)
+        else:
+            T_scale = T_scale_avg
+            P_scale = P_scale_avg
+            Q_scale = Q_scale_avg
+            U_scale = U_scale_avg
         #V_scale = np.nanmax(np.abs(V_maps[i]))
+        V_scale = np.nanpercentile(np.abs(V_maps[i]), 99.5)
         
         #Reverse row index: Bottom row = steps - 1, Top row = 0 -----------------------------------------------------------------------------------------------
         row_idx = (steps - 1) - i
@@ -448,7 +494,7 @@ if __name__ == "__main__":
             z_str = f"z = {z_val:.2f}"
             
         ax_text.text(0.1, 0.5, f"\n{z_str}", 
-                     fontsize=18, ha='left', va='center', fontweight='bold')
+                     fontsize=26, ha='left', va='center', fontweight='bold')
         
         # Columns 2-5: The Maps -----------------------------------------------------------------------------------------------
         plot_styled_map(T_maps[i], 'turbo', -T_scale, T_scale, "T [K]", base_pos + 2, is_top)
@@ -468,31 +514,6 @@ if __name__ == "__main__":
     arg2 = 1.5 * np.sqrt(Omega_L) * eval_times
     a_t2 = ((Omega_m / Omega_L)**(1/3)) * ((np.sinh(arg2))**(2/3))
     z_evals = (1.0 / a_t2) - 1.0
-    
-    #Compute RMS amplitudes across pixels for each time step -----------------------------------------------------------------------------------------------
-    T_rms = [np.sqrt(np.nanmean(T_maps[i]**2)) for i in range(steps)]
-    P_rms = [np.sqrt(np.nanmean(P_maps[i]**2)) for i in range(steps)]
-    Q_rms = [np.sqrt(np.nanmean(Q_maps[i]**2)) for i in range(steps)]
-    U_rms = [np.sqrt(np.nanmean(U_maps[i]**2)) for i in range(steps)]
-
-    plt.figure(figsize=(8, 5))
-    plt.plot(z_evals, T_rms, 'o-', label='T RMS', lw=2)
-    plt.plot(z_evals, P_rms, 's-', label='P RMS', lw=2)
-    plt.plot(z_evals, Q_rms, '^-', label='Q RMS', lw=2)
-    plt.plot(z_evals, U_rms, 'd-', label='U RMS', lw=2)
-    
-    plt.xlabel('Redshift ($z$)', fontsize=12)
-    plt.ylabel('RMS Amplitude [K]', fontsize=12)
-    plt.yscale('log')
-    plt.gca().invert_xaxis()
-    plt.title('Evolution of fluctuation amplitudes in Solv', fontsize=14)
-    plt.legend()
-    plt.grid(True, which="both", ls="--", alpha=0.5)
-    
-    amp_save_path = os.path.join(output_dir, "solv_ampl.png")
-    plt.savefig(amp_save_path, dpi=200, bbox_inches='tight')
-    plt.close()
-    print(f"Amplitude evolution curve saved to: {amp_save_path}")
     
     #Comparison with official maps
     export_dir = "results_maps"

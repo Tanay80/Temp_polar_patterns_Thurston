@@ -1,0 +1,13 @@
+> importnumpy as np
+> import camb
+
+> pars = camb.CAMBparams()
+> pars.set_cosmology(H0=67.4, ombh2=0.0221, omch2=0.12)
+> pars.InitPower.set_params(r=0.41, ns=0.96)					#Planck 2018 results. V. CMB power spectra and likelihoods
+> pars.WantTensors = True
+> pars.set_for_lmax(30, lens_potential_accuracy=1)
+> results = camb.get_results(pars)
+> powers = results.get_cmb_power_spectra(pars, CMB_unit='muK')
+> Dl_BB = powers['tensor'][:, 2]
+> Cl_BB_l2 = Dl_BB[2] * 2*np.pi / (2*3)
+> print(f"C_2^BB (r=0.41) = {Cl_BB_l2:.6e} uK^2")
