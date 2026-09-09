@@ -26,16 +26,16 @@ $(l=2,m=2)$ initial quadrupole.
 ## Repository structure
 
 ```
-RH2.py, RS2.py, UH2.py, nil.py, solv.py   # per-geometry ODE solvers
-helper_code.py                             # shared utility functions
-run_geometries.py                          # runs all five solvers in sequence
-maps_summary.py                            # per-geometry T/Q/U/P map grids (redshift evolution)
+RH2.py, RS2.py, UH2.py, nil.py, solv.py    #Per-geometry ODE solvers
+helper_code.py                             #Shared utility functions
+run_geometries.py                          #Runs all five solvers in sequence
+maps_summary.py                            #Per-geometry T/Q/U/P map grids (redshift evolution)
 teb_nil.py, teb_rh2.py, teb_rs2.py,
-teb_solv.py, teb_uh2.py                    # per-geometry T/E/B decomposition (development versions)
-teb.py                                     # unified T/E/B decomposition across all five geometries
-unified_cosmic_anomaly_analysis.py         # the seven-point anomaly diagnostic suite
-skymap_comparison_vs_planck.py             # model-vs-Planck sky map grid + residuals
-MASTER_BUTTON.py                           # runs the full pipeline end-to-end
+teb_solv.py, teb_uh2.py                    #Per-geometry T/E/B decomposition (development versions)
+teb.py                                     #Unified T/E/B decomposition across all five geometries
+unified_cosmic_anomaly_analysis.py         #The seven-point anomaly diagnostic suite
+skymap_comparison_vs_planck.py             #Model-vs-Planck sky map grid + residuals
+MASTER_BUTTON.py                           #Runs the full pipeline end-to-end
 ```
 
 ### Data dependencies (not tracked in git -- download separately)
