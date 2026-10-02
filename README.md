@@ -48,7 +48,7 @@ Each solver integrates, for every HEALPix pixel ($N_\text{side}=32$, 12288 pixel
 a stiff system of coupled ODEs. The state vector contains:
 
 - the 44 real and imaginary moments $R^0 _\mu, I^0 _\mu, R^0 _{ij}, I^0 _{ij}, R^2 _{ij}, I^2 _{ij}$, and
-- the geodesic variables $\left(\operatorname{Re}\psi,\ \operatorname{Im}\psi,\ \theta,\ \phi,\ \chi \right)$ and,
+- the geodesic variables $\left(\Re\left\lbrace\psi\right\rbrace,\ \Im\left\lbrace\psi\right\rbrace,\ \theta,\ \phi,\ \chi\right)$ and,
   where needed, the Cartesian coordinates of the ray.
 
 The total length depends on the geometry (for example 49 for $\mathbb{R}^3$,
