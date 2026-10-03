@@ -86,7 +86,7 @@ evaluated with a comoving mean free path $\Delta\eta$ at decoupling.
 
 ### 3. Outputs
 
-Maps are saved at timepoints z = 1200, 1100, 550 and 0, respectively.
+Maps are saved at timepoints z = 1200, 550, 10 and 0, respectively.
 
 - `maps/<Geometry>_maps.npz` contains `T` (temperature fluctuation, K), `Q_K`, `U_K`
   (K), `I`, `Q`, `U`, `P`, `z` and `nside`.
