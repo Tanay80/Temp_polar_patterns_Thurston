@@ -75,7 +75,7 @@ $C_2 = \tfrac{4\pi}{25}\int d\ln k\,\mathcal{P}_\mathcal{R}(k)\,j_2^2(k\Delta\et
 evaluated with a comoving mean free path $\Delta\eta$ at decoupling.
 
 **Numerics.**
-- Symmetry $\left(N^{0,2}_{ij} = N^{0,2}_{ji} \right)$ and tracelessness $\left(\delta^{ij}N^{0,2}_{ij} = 0 \right)$ are enforced at every right-hand-side
+- Symmetry $\left(N^{0,2}{} _{ij} = N^{0,2}{} _{ji} \right)$ and tracelessness $\left(\delta^{ij}N^{0,2}_{ij} = 0 \right)$ are enforced at every right-hand-side
   evaluation on a *copy* of the state vector. This avoids corrupting the solver's
   finite-difference Jacobian.
 - Integration uses SciPy's implicit `Radau` method (`rtol=1e-6`) with
