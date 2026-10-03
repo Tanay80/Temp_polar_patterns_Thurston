@@ -27,10 +27,9 @@ not compare against observational data.
 
 ### 1. Symbolic stage (`injector.py`, `generator.py`)
 
-- **`injector.py`** takes a set of commutation functions $\gamma^a{}_{bc}$ for a
-  chosen geometry and builds the Ricci rotation coefficients $\Gamma^a{}_{bc}$ in an
-  orthonormal tetrad (Sung & Coles
-  (eq. 2.15), being contracted with MInkowski metric), with torsion and metric-compatibility checks. From these, it
+- **`injector.py`** takes a set of commutation functions $\gamma^a{} _{bc}$ for a
+  chosen geometry and builds the Ricci rotation coefficients $\Gamma^a{} _{bc}$ in an
+  orthonormal tetrad (Sung & Coles (eq. 2.15), being contracted with MInkowski metric), with torsion and metric-compatibility checks. From these, it
   evaluates the Boltzmann coefficients $\hat{A}^k _i$ to $\hat{K}^{kl} _{ij}$ of Sung & Coles
   (eq. 3.25). Coefficients with index pairs $\left(ij \right)$ or $\left(kl \right)$ are projected
   onto their symmetric-traceless (STF) part.
