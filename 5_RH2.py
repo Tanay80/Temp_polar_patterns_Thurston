@@ -870,7 +870,7 @@ def solve_single_pixel(args):
 if __name__ == "__main__":
 
     NSIDE = 32                                                              #Uniform in z
-    z_targets = np.array([1200.0, 1100.0, 550.0, 0.0])
+    z_targets = np.array([1200.0, 550.0, 10.0, 0.0])
     steps = len(z_targets)
     a_eval = 1.0 / (1.0 + z_targets)
     
@@ -934,16 +934,7 @@ if __name__ == "__main__":
 
     P_maps = np.sqrt(Q_maps**2 + U_maps**2)/I_maps
     
-    #T,E,B maps
-    tag = "RH2"
     os.makedirs("maps", exist_ok=True)
-    Q_K = Q_maps / prefactor_arr[:, None] * T_local_arr[:, None]
-    U_K = U_maps / prefactor_arr[:, None] * T_local_arr[:, None]
-
-    np.savez_compressed(f"maps/{tag}_maps.npz",
-                        T=T_maps, Q_K=Q_K, U_K=U_K,
-                        I=I_maps, Q=Q_maps, U=U_maps, P=P_maps,
-                        z=z_targets, nside=NSIDE)
 
     plt.rcParams['font.family'] = 'serif'
     output_dir = "maps"
@@ -982,16 +973,7 @@ if __name__ == "__main__":
         ax_text = fig.add_subplot(rows, cols, base_pos + 1)
         ax_text.axis('off')
 
-        if i == 0:
-            z_str = "z = 1200"
-        elif i == steps - 1:
-            z_str = "z = 0"
-        elif z_val > 100:
-            z_str = f"z = {z_val:.0f}"
-        elif z_val > 10:
-            z_str = f"z = {z_val:.1f}"
-        else:
-            z_str = f"z = {z_val:.2f}"
+        z_str = f"z = {int(round(z_targets[i]))}"
 
         ax_text.text(0.1, 0.5, f"\n{z_str}", fontsize=26, ha='left', va='center', fontweight='bold')
 
