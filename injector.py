@@ -1,5 +1,5 @@
-#This code lets you supply your set of structure constants for each Thurston geometry
-#(Just uncomment them one-by-one at the end of the code)
+#This code lets you supply ypur spacetime metrices
+
 import sympy as sp
 
 R = sp.Rational
@@ -266,13 +266,13 @@ a = sp.symbols("a", positive=True)
 #}
 
 #8. Solv
-#k = sp.symbols("k", negative=True)
-#entries = {
-#    (1, 0, 1): -H,
-#    (2, 0, 2): -H,
-#    (3, 0, 3): -H,
-#    (1, 3, 1): -sp.sqrt(-k)/a,
-#    (2, 3, 2): sp.sqrt(-k)/a,
-#}
+k = sp.symbols("k", negative=True)
+entries = {
+    (1, 0, 1): -H,
+    (2, 0, 2): -H,
+    (3, 0, 3): -H,
+    (1, 3, 1): -sp.sqrt(-k)/a,
+    (2, 3, 2): sp.sqrt(-k)/a,
+}
 
 Gam, coef = run(entries)

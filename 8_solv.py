@@ -44,6 +44,12 @@ def chi_of_a(a_target, a_start):
     integrand = lambda a: 1.0/(a**2 * H0*np.sqrt(Omega_m*a**-3 + Omega_k*a**-2 + Omega_L))                  #d(theta)/dt = d(phi)/dt = 0 at initial (z = 1100)
     val, _ = quad(integrand, a_start, a_target, limit=200)
     return val
+    
+def optical_depth(a_start, a_end=1.0):
+    f = lambda lna: tau_of_a(np.exp(lna)) / (H0*np.sqrt(Omega_m*np.exp(-3*lna) + Omega_k*np.exp(-2*lna) + Omega_L))
+    pts = [np.log(1/21), np.log(1/6)]
+    pts = [p for p in pts if np.log(a_start) < p < np.log(a_end)]
+    return quad(f, np.log(a_start), np.log(a_end), points=pts or None, limit=400)[0]
 
 def derivatives_hpc(a, y):
     y = np.array(y, dtype=float)
@@ -756,7 +762,7 @@ def build_y0(theta0, phi0, m_case, chi_init):
     #np.since we do not have a kinematic shear in this form [Sung & Coles]
     y0[0] = 1.0e-6                                                                                          #Initial monopole
 
-    #Initial seeds (from CAMB, normalized by T0 = 2.725e+6 uK) -----------------------------------------
+    #Initial seeds (from CAMB, as relative temp. fluctuations) -----------------------------------------
     if m_case == 0:
         #1. l = 2, m = 0
         y0[8] = -2.765e-6                                                                                   #R0_11
@@ -780,7 +786,7 @@ def build_y0(theta0, phi0, m_case, chi_init):
     y0[51] = chi_init*np.cos(theta0)
     return y0
     
-def compute_T_local_and_prefactor(a_eval_pts, T_background, nu_instrument, h, c,
+def compute_T_local_and_prefactor(a_eval_pts, T_background, nu_instrument, h, c, k_B,
                                    Omega_m=0.315, Omega_L=0.641):
     T_local_arr = np.zeros(len(a_eval_pts))
     prefactor_arr = np.zeros(len(a_eval_pts))
@@ -789,7 +795,9 @@ def compute_T_local_and_prefactor(a_eval_pts, T_background, nu_instrument, h, c,
         z_val = 1.0 / a_i - 1.0
 
         T_local = T_background * (1.0 + z_val)
-        prefactor = 2.0 * h * nu_instrument**3 / c**2
+        A = 2.0*h*nu_instrument**3/c**2
+        x_freq = h*nu_instrument/(k_B*T_local)
+        prefactor = A/(np.exp(x_freq)-1.0) * x_freq*np.exp(x_freq)/(np.exp(x_freq)-1.0)
 
         T_local_arr[idx] = T_local
         prefactor_arr[idx] = prefactor
@@ -864,18 +872,19 @@ def solve_single_pixel(args):
 
 if __name__ == "__main__":
 
-    NSIDE = 32                                                                  #Uniform in z
+    NSIDE = 32                                                                                              #Uniform in z
     z_targets = np.array([1200.0, 550.0, 10.0, 0.0])
     steps = len(z_targets)
     a_eval = 1.0 / (1.0 + z_targets)
     
-    T_background = 2.725                                                    #Background zeroth-order temperature
-    c = 3e8                                                                 #Speed of light in vacuum
-    h = 6.626e-34                                                           #Planck's constant
-    nu_instrument = 1.5e11                                                  #Detector frequency
+    T_background = 2.725                                                                                    #Background zeroth-order temperature
+    c = 3e8                                                                                                 #Speed of light in vacuum
+    h = 6.626e-34                                                                                           #Planck's constant
+    nu_instrument = 1.5e11                                                                                  #Detector frequency
+    k_B = 1.380649e-23
     
     T_local_arr, prefactor_arr = compute_T_local_and_prefactor(
-        a_eval, T_background, nu_instrument, h, c)
+        a_eval, T_background, nu_instrument, h, c, k_B)
 
     NPIX = hp.nside2npix(NSIDE)
     theta_arr, phi_arr = hp.pix2ang(NSIDE, np.arange(NPIX))
@@ -887,6 +896,46 @@ if __name__ == "__main__":
     a_init = 1.0/(1.0 + z_targets[0])
     chi_init = chi_of_a(1.0, a_start=a_init)
     print(f"chi_init = {chi_init:.6f}", flush=True)
+    
+    #------------------------ Twist buildup ------------------------
+    z_diag = np.array([1200., 1100., 900., 550., 300., 100., 30., 10., 3., 1., 0.])
+    z_diag[0] = z_targets[0]
+    a_diag = 1.0/(1.0 + z_diag)
+    pix_idx = np.linspace(0, NPIX-1, 24).astype(int)
+    pix_idx = pix_idx[np.abs(np.cos(theta_arr[pix_idx])) < 0.9]
+
+    wrap = lambda x: (x + np.pi) % (2*np.pi) - np.pi
+    ang_l, pol_l = [], []
+    for p in pix_idx:
+        y0 = build_y0(theta_arr[p], phi_arr[p], 0, chi_init)
+        atol = np.full(len(y0), 1e-13); atol[44:48] = 1e-10; atol[48:] = 1e6
+        sol = integrate.solve_ivp(derivatives_hpc, (a_diag[0], a_diag[-1]), y0, t_eval=a_diag,
+                                  method='Radau', rtol=1e-6, atol=atol)
+        if sol.y.shape[1] != len(a_diag) or not np.all(np.isfinite(sol.y)):
+            continue
+        th, ph, ps = sol.y[46], sol.y[47], sol.y[44] + sol.y[45]
+        dth, dph, dps = np.diff(th), wrap(np.diff(ph)), np.diff(ps)
+        ang_l.append(np.sqrt(dth**2 + (np.sin(th[:-1])*dph)**2))
+        pol_l.append(2*dps)
+
+    ang, pol = np.array(ang_l), np.array(pol_l)
+    cum_ang = np.degrees(np.concatenate(([0.0], np.cumsum(np.sqrt((ang**2).mean(axis=0))))))
+    cum_pol = np.degrees(np.concatenate(([0.0], np.cumsum(np.sqrt((pol**2).mean(axis=0))))))
+
+    os.makedirs("maps", exist_ok=True)
+    fig_tw, ax_tw = plt.subplots(figsize=(8, 5))
+    ax_tw.plot(1.0 + z_diag, cum_ang, 'o-', lw=2, label='Ray direction shift')
+    ax_tw.plot(1.0 + z_diag, cum_pol, 's-', lw=2, label=r'Polarization rotation $2\Delta\Psi$')
+    ax_tw.set_xscale('log')
+    ax_tw.invert_xaxis()
+    ax_tw.set_xlabel('1 + z')
+    ax_tw.set_ylabel(r'Cumulative twist $\left(^\circ \right)$')
+    ax_tw.grid(alpha=0.3, which='both')
+    ax_tw.legend()
+    fig_tw.tight_layout()
+    fig_tw.savefig(os.path.join("maps", "twist_buildup_solv.png"), dpi=200)
+    plt.close(fig_tw)
+    #---------------------------------------------------------------
     
     tasks = [(i, theta_arr[i], phi_arr[i], a_eval, T_local_arr, prefactor_arr, chi_init) for i in range(NPIX)]
 
@@ -929,7 +978,32 @@ if __name__ == "__main__":
 
     P_maps = np.sqrt(Q_maps**2 + U_maps**2)/I_maps
     
+    dIdT_arr = prefactor_arr / T_local_arr			                                                        #partial derivative of Planck intensity with temp.			
+    T_uK = T_maps * 1e6
+    Q_uK = Q_maps / dIdT_arr[:, None] * 1e6
+    U_uK = U_maps / dIdT_arr[:, None] * 1e6
+    
     os.makedirs("maps", exist_ok=True)
+    
+    #----------------------- Damping of optical depth and hence the magnitude --------------
+    a_p = np.logspace(np.log10(1/3001), 0, 400)
+    z_p = 1/a_p - 1
+    rate = np.array([tau_of_a(a) for a in a_p])
+    tau_cum = np.array([optical_depth(a) for a in a_p])
+
+    fig_t, ax_t = plt.subplots(figsize=(8, 5))
+    ax_t.plot(1+z_p, tau_cum, lw=2, label=r'$\tau(z)$ (cumulative)')
+    ax_t.plot(1+z_p, rate/H0, lw=2, ls='--', label=r'$\dot\tau/H_0$')
+    for zt in z_targets:
+        ax_t.axvline(1+zt, color='gray', lw=0.8, alpha=0.5)
+    ax_t.axhline(1, color='k', lw=0.8, ls=':')
+    ax_t.set_xscale('log'); ax_t.set_yscale('log'); ax_t.invert_xaxis()
+    ax_t.set_xlabel('1 + z'); ax_t.set_ylabel('optical depth / scattering rate')
+    ax_t.grid(alpha=0.3, which='both'); ax_t.legend()
+    fig_t.tight_layout()
+    fig_t.savefig(os.path.join("maps", "tau_vs_z_solv.png"), dpi=200)
+    plt.close(fig_t)
+    #----------------------------------------------------------------------------------------
 
     plt.rcParams['font.family'] = 'serif'
     output_dir = "maps"
@@ -956,10 +1030,10 @@ if __name__ == "__main__":
     for i, a_val in enumerate(a_eval):
         z_val = 1.0 / a_val - 1.0
 
-        T_scale = np.nanmax(np.abs(T_maps[i]))
+        T_scale = np.nanmax(np.abs(T_uK[i]))
         P_scale = np.nanmax(P_maps[i])
-        Q_scale = np.nanmax(np.abs(Q_maps[i]))
-        U_scale = np.nanmax(np.abs(U_maps[i]))
+        Q_scale = np.nanmax(np.abs(Q_uK[i]))
+        U_scale = np.nanmax(np.abs(U_uK[i]))
 
         row_idx = (steps - 1) - i
         base_pos = row_idx * cols
@@ -972,10 +1046,10 @@ if __name__ == "__main__":
 
         ax_text.text(0.1, 0.5, f"\n{z_str}", fontsize=26, ha='left', va='center', fontweight='bold')
 
-        plot_styled_map(T_maps[i], 'turbo', -T_scale, T_scale, r"$\Delta \text{T} \, \left(\text{K} \right)$", base_pos + 2, is_top)
+        plot_styled_map(T_uK[i], 'turbo', -T_scale, T_scale, r"$\Delta \text{T} \, (\mu\text{K})$", base_pos + 2, is_top)
         plot_styled_map(P_maps[i], 'turbo', 0, P_scale, r"$\text{P}$", base_pos + 3, is_top)
-        plot_styled_map(Q_maps[i], 'turbo', -Q_scale, Q_scale, r"$\text{Q} \, \left(\text{W} \, \text{sr}^{-1} \, \text{m}^{-2} \, \text{Hz}^{-1} \right)$", base_pos + 4, is_top)
-        plot_styled_map(U_maps[i], 'turbo', -U_scale, U_scale, r"$\text{U} \,  \left(\text{W} \, \text{sr}^{-1} \, \text{m}^{-2} \, \text{Hz}^{-1} \right)$", base_pos + 5, is_top)
+        plot_styled_map(Q_uK[i], 'turbo', -Q_scale, Q_scale, r"$\text{Q} \, (\mu\text{K})$", base_pos + 4, is_top)
+        plot_styled_map(U_uK[i], 'turbo', -U_scale, U_scale, r"$\text{U} \, (\mu\text{K})$", base_pos + 5, is_top)
 
     plt.subplots_adjust(hspace=0.3, wspace=0.25)
     save_path = os.path.join(output_dir, "Solv.png")
