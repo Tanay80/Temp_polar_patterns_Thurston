@@ -103,12 +103,14 @@ injector.py                                             #Gamma^a_bc and STF-proj
 generator.py                                            #Geodesic & polarization equations and zeta expressions
 initial.py                                              #Initial conditions/ seed amplitudes
 1_R3.py ... 8_solv.py                                   #Per-geometry ODE solvers and map generation
+runall.py                                               #To run once for all geometries sequentially
 maps/                                                   #Output .png figures and .npz files
 ```
 
 ## Usage
 
 ```bash
+python runall.py                                        #To run once for all geometries sequentially
 python 1_R3.py ... 8_solv.py                            #Each for a single geometry
 ```
 
