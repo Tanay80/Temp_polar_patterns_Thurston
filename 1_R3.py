@@ -15,6 +15,14 @@ import matplotlib.ticker as ticker
 from scipy.integrate import quad
 import camb
 
+c = 2.99792458e8                                                                                            #Speed of light (m/s)
+h = 6.62607015e-34                                                                                          #Planck's constant (J s)
+k_B = 1.380649e-23                                                                                          #Boltzmann constant (J/K)
+T0 = 2.725                                                                                                  #Background temperature today (K)
+nu = 1.5e11                                                                                                 #Detector frequency (Hz)
+X0 = h*nu/(k_B*T0)                                                                                          #x = h*nu/(k_B*T0) = 2.642, conserved
+RJ2CMB = 1.736                                                                                              #Antenna (or RJ) to CMB (or thermodynamic) temp. conversion facot np.expm1(X0)**2/(X0**2*np.exp(X0))
+
 Omega_k = 0                                                                                                 #Hardcoded from CMB constraints (Prokopec's paper)
 Omega_m = 0.3                                                                                               #A value consistent with Planck
 Omega_L = 1.0 - Omega_m - Omega_k                                                                           #(= 0.641); Friedmann constraint, Omega_m + Omega_L + Omega_k = 1
@@ -118,17 +126,17 @@ def derivatives_hpc(a, y):
     z_r3 = z_r2**2
     z_r4 = 1/np.tan(theta)
     z_r5 = 3*H*a*chi
-    #Re_Zeta = (3*a*chi*tau*z_r1 + z_r0*z_r4*I0_2 + 2*z_r0*I0_1 - z_r1*z_r5 + z_r2*z_r4*R0_2 + 2*z_r2*R0_1 - z_r3*z_r5)/(3*H*a*chi*(z_r1 + z_r3))
+    Re_Zeta = (3*a*chi*tau*z_r1 + z_r0*z_r4*I0_2 + 2*z_r0*I0_1 - z_r1*z_r5 + z_r2*z_r4*R0_2 + 2*z_r2*R0_1 - z_r3*z_r5)/(3*H*a*chi*(z_r1 + z_r3))
     
     #Im_Zeta from Cramer's rule
     z_i0 = I0_0
     z_i1 = R0_0
     z_i2 = 1/np.tan(theta)
-    #Im_Zeta = (3*a*chi*tau*z_i0*z_i1 - z_i0*z_i2*R0_2 - 2*z_i0*R0_1 + z_i1*z_i2*I0_2 + 2*z_i1*I0_1)/(3*H*a*chi*(z_i0**2 + z_i1**2))
+    Im_Zeta = (3*a*chi*tau*z_i0*z_i1 - z_i0*z_i2*R0_2 - 2*z_i0*R0_1 + z_i1*z_i2*I0_2 + 2*z_i1*I0_1)/(3*H*a*chi*(z_i0**2 + z_i1**2))
 
     #Planck distrn. describes the radiation field
-    Re_Zeta = 0.0012
-    Im_Zeta = 0
+    #Re_Zeta = -2.845
+    #Im_Zeta = 0
 
     #Ricci rotation coefficients (spin connections) in physical units
     Gamma0_00 = 0
@@ -723,8 +731,8 @@ def derivatives_hpc(a, y):
     dI2_33 = -dI2_11 - dI2_22
     
     #Photon monopole = Abs. BG temp.
-    I0_0 = 0
-    dI0_0 = 0
+    #I0_0 = 0
+    #dI0_0 = 0
     
     #Radial comoving distance (chi) evolution equation in physical time
     #d_chi = np.sqrt((1/a**2) - (chi**2)*((d_theta)**2 + (np.sin(theta)*(d_phi))**2))
@@ -781,26 +789,8 @@ def build_y0(theta0, phi0, m_case, chi_init):
     y0[46], y0[47], y0[48] = theta0, phi0, chi_init
     return y0
 
-def compute_T_local_and_prefactor(a_eval_pts, T_background, nu_instrument, h, c, k_B,
-                                   Omega_m=0.3, Omega_L=0.7):
-    T_local_arr = np.zeros(len(a_eval_pts))
-    prefactor_arr = np.zeros(len(a_eval_pts))
-
-    for idx, a_i in enumerate(a_eval_pts):
-        z_val = 1.0 / a_i - 1.0
-
-        T_local = T_background * (1.0 + z_val)
-        A = 2.0*h*nu_instrument**3/c**2
-        x_freq = h*nu_instrument/(k_B*T_local)
-        prefactor = A/(np.exp(x_freq)-1.0) * x_freq*np.exp(x_freq)/(np.exp(x_freq)-1.0)
-
-        T_local_arr[idx] = T_local
-        prefactor_arr[idx] = prefactor
-
-    return T_local_arr, prefactor_arr
-
 def solve_single_pixel(args):
-    idx, theta_0, phi_0, a_eval_pts, T_local_arr, prefactor_arr, chi_init = args
+    idx, theta_0, phi_0, a_eval_pts, chi_init = args
     n = len(a_eval_pts)
     dT_tot, I_tot, Q_tot, U_tot, V_tot = np.zeros(n), np.zeros(n), np.zeros(n), np.zeros(n), np.zeros(n)
 
@@ -847,19 +837,15 @@ def solve_single_pixel(args):
             Q_val = Q_raw*c2 + U_raw*s2                                                                     #Q/I
             U_val = -Q_raw*s2 + U_raw*c2                                                                    #U/I
 
-            I0_0, I0_vec, I0_tensor = s[1], s[5:8], s[17:26].reshape(3, 3)     
-
-            T_local = T_local_arr[i]
-            prefactor_value = prefactor_arr[i]
+            I0_0, I0_vec, I0_tensor = s[1], s[5:8], s[17:26].reshape(3, 3)
             
-            dT_tot[i] += dT_over_T * T_local                                                                #Pure temperature fluctuations
-            I_tot[i] += I_val * prefactor_value                                                             #Pure Stokes: total intensity 'I'
-            Q_tot[i] += Q_val * prefactor_value                                                             #Pure Stokes 'Q'
-            U_tot[i] += U_val * prefactor_value                                                             #Pure Stokes 'U'
+            dT_tot[i] += dT_over_T                                                                          #Pure temperature fluctuations
+            I_tot[i] += I_val                                                                               #Pure Stokes: total intensity 'I'
+            Q_tot[i] += Q_val                                                                               #Pure Stokes 'Q'
+            U_tot[i] += U_val                                                                               #Pure Stokes 'U'
             
             #Consistency check for circular polarization
             V_val = I0_0 + np.dot(I0_vec, k_vec) + np.sum(I0_tensor * k_tensor)
-            V_val = V_val * prefactor_value
             V_tot[i] = max(V_tot[i], abs(V_val))                                                            #Pure Stokes 'V'
 
     return (idx, dT_tot.tolist(), I_tot.tolist(), Q_tot.tolist(), U_tot.tolist(), V_tot.tolist())
@@ -870,21 +856,13 @@ if __name__ == "__main__":
     z_targets = np.array([1200.0, 550.0, 10.0, 0.0])
     steps = len(z_targets)
     a_eval = 1.0 / (1.0 + z_targets)
-    
-    T_background = 2.725                                                                                    #Background zeroth-order temperature
-    c = 3e8                                                                                                 #Speed of light in vacuum
-    h = 6.626e-34                                                                                           #Planck's constant
-    nu_instrument = 1.5e11                                                                                  #Detector frequency
-    k_B = 1.380649e-23
-    
-    T_local_arr, prefactor_arr = compute_T_local_and_prefactor(
-        a_eval, T_background, nu_instrument, h, c, k_B)
+    T_local_arr = T0*(1.0 + z_targets)                                                                      #local background temperature at each z
 
     NPIX = hp.nside2npix(NSIDE)
     theta_arr, phi_arr = hp.pix2ang(NSIDE, np.arange(NPIX))
 
     #cores = len(os.sched_getaffinity(0))
-    cores = 8
+    cores = 16
     print(f"Cores = {cores}", flush=True)
 
     a_init = 1.0/(1.0 + z_targets[0])
@@ -931,7 +909,7 @@ if __name__ == "__main__":
     plt.close(fig_tw)
     #---------------------------------------------------------------
     
-    tasks = [(i, theta_arr[i], phi_arr[i], a_eval, T_local_arr, prefactor_arr, chi_init) for i in range(NPIX)]
+    tasks = [(i, theta_arr[i], phi_arr[i], a_eval, chi_init) for i in range(NPIX)]
 
     T_maps = np.full((steps, NPIX), np.nan)
     I_maps = np.full((steps, NPIX), np.nan)
@@ -963,7 +941,7 @@ if __name__ == "__main__":
     #Consistency checks
     print("Consistency checks:")
     for i, a_val in enumerate(a_eval):
-        print(f"At z = {z_targets[i]:.4f}: T_local = {T_local_arr[i]:.4f} K, Max |V| = {max_V_per_step[i]:.2e}")
+        print(f"At z = {z_targets[i]:.4f}: Max |V| = {max_V_per_step[i]:.2e}")
 
     T_maps = np.nan_to_num(T_maps, nan=0.0, posinf=0.0, neginf=0.0)
     I_maps = np.nan_to_num(I_maps, nan=0.0, posinf=0.0, neginf=0.0)
@@ -972,10 +950,14 @@ if __name__ == "__main__":
 
     P_maps = np.sqrt(Q_maps**2 + U_maps**2)/I_maps
     
-    dIdT_arr = prefactor_arr / T_local_arr			                                                        #partial derivative of Planck intensity with temp.			
-    T_uK = T_maps * 1e6
-    Q_uK = Q_maps / dIdT_arr[:, None] * 1e6
-    U_uK = U_maps / dIdT_arr[:, None] * 1e6
+    #ΔT: relative fluctuation x local background temperature
+    T_uK = T_maps * T_local_arr[:, None] * 1e6 * RJ2CMB
+
+    #I, Q, U: W m^-2 Hz^-1 sr^-1 -> K
+    A_int = 2.0*h*nu**3/c**2
+    RJ = (c**2)/(2.0*k_B*nu**2)
+    Q_uK = RJ * (A_int*Q_maps) * 1e6 * RJ2CMB
+    U_uK = RJ * (A_int*U_maps) * 1e6 * RJ2CMB
     
     os.makedirs("maps", exist_ok=True)
     
